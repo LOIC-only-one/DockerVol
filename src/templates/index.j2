@@ -1,5 +1,10 @@
 {% extends "base.j2" %}
 {% block content %}
+<section id="jobs" hidden>
+  <div class="head"><h2>Tâches</h2></div>
+  <div id="job-list"></div>
+</section>
+
 <section>
   <div class="head">
     <h2>Volumes <span class="count">{{ volumes|length }}</span></h2>
@@ -42,4 +47,52 @@
   </form>
 </section>
 {% endif %}
+
+<script>
+  const fmtSize = n => {
+    const u = ["o", "Ko", "Mo", "Go", "To"]; let i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return n.toFixed(i ? 1 : 0).replace(".", ",") + " " + u[i];
+  };
+  const fmtTime = s => {
+    s = Math.ceil(s);
+    if (s < 60) return s + " s";
+    if (s < 3600) return Math.floor(s / 60) + " min " + String(s % 60).padStart(2, "0") + " s";
+    return Math.floor(s / 3600) + " h " + String(Math.floor(s % 3600 / 60)).padStart(2, "0") + " min";
+  };
+  const el = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;  // textContent: volume names and errors are never parsed as HTML
+    return e;
+  };
+
+  function describe(j) {
+    if (j.status === "queued") return "En attente";
+    if (j.status === "error") return "Erreur : " + j.error;
+    if (j.status === "done") return "Terminé → " + j.result;
+    if (!j.total) return j.phase + "…";
+    const parts = [j.phase, Math.floor(100 * j.done / j.total) + " %", fmtSize(j.done) + " / " + fmtSize(j.total)];
+    parts.push(j.eta == null ? "calcul du temps restant…" : "reste " + fmtTime(j.eta));
+    return parts.join(" · ");
+  }
+
+  async function poll() {
+    let list;
+    try { list = await (await fetch("{{ url_for('job_list') }}")).json(); }
+    catch { return setTimeout(poll, 3000); }
+    document.getElementById("jobs").hidden = list.length === 0;
+    const box = document.getElementById("job-list");
+    box.replaceChildren(...list.map(j => {
+      const row = el("div", "job " + j.status), line = el("div", "line"), bar = el("div", "bar"), fill = el("div");
+      line.append(el("span", "vol", j.volume), el("span", "info" + (j.status === "error" ? " err" : ""), describe(j)));
+      fill.style.width = (j.status === "done" ? 100 : j.total ? 100 * j.done / j.total : 0) + "%";
+      bar.append(fill);
+      row.append(line, bar);
+      return row;
+    }));
+    if (list.some(j => j.status === "queued" || j.status === "running")) setTimeout(poll, 1000);
+  }
+  poll();
+</script>
 {% endblock %}

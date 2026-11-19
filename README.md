@@ -11,6 +11,7 @@ DockerVol liste les volumes Docker d'un hôte, les archive en `tar.gz` et peut l
 - **Inventaire** des volumes présents dans `/var/lib/docker/volumes/`
 - **Archivage** d'un volume ou de tous les volumes en `tar.gz`
 - **Réplication** d'un volume vers un serveur distant (SSH + SFTP)
+- **Suivi des tâches** : barre de progression et temps restant pour l'archivage et le transfert
 - **Interface web** claire, avec thème clair/sombre automatique
 - **Journalisation** des erreurs dans `docker_volume_transfer.log`
 
@@ -89,7 +90,7 @@ sudo python3 src/volumes.py
 └── src/
     ├── runtime.py       # Interface web (routes Flask)
     ├── volumes.py       # Logique : volumes, archives, SSH/SFTP
-    ├── static/          # Logo (logo.svg)
+    ├── static/          # Logo et polices (IBM Plex, licence OFL)
     └── templates/       # Gabarits Jinja (base.j2, index.j2)
 ```
 
