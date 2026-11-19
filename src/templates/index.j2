@@ -20,10 +20,10 @@
     <div class="body muted">Aucun volume.</div>
   {% else %}
   <table>
-    {% for v in volumes %}
+    {% for v, info in volumes.items() %}
       <tr>
-        <td class="name">{{ v }}</td>
-        <td class="act"><form method="post" action="{{ url_for('archive', name=v) }}"><button class="secondary">Archiver</button></form></td>
+        <td class="name">{{ v }}{% if info.problem %}<div class="muted">{{ info.problem }}</div>{% endif %}</td>
+        <td class="act"><form method="post" action="{{ url_for('archive', name=v) }}"><button class="secondary"{% if info.problem %} disabled title="{{ info.problem }}"{% endif %}>Archiver</button></form></td>
       </tr>
     {% endfor %}
   </table>
@@ -37,7 +37,7 @@
         onsubmit="this.action = '{{ url_for('transfer', name='__V__') }}'.replace('__V__', encodeURIComponent(this.volume.value))">
     <div class="grid">
       <div><label for="volume">Volume</label>
-        <select id="volume" name="volume">{% for v in volumes %}<option>{{ v }}</option>{% endfor %}</select></div>
+        <select id="volume" name="volume">{% for v, info in volumes.items() if not info.problem %}<option>{{ v }}</option>{% endfor %}</select></div>
       <div><label for="host">Hôte</label><input id="host" name="host" required placeholder="192.168.1.10"></div>
       <div><label for="user">Utilisateur</label><input id="user" name="user" required></div>
       <div><label for="password">Mot de passe</label><input id="password" name="password" type="password" required></div>

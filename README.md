@@ -8,7 +8,7 @@ DockerVol liste les volumes Docker d'un hôte, les archive en `tar.gz` et peut l
 
 ## Fonctionnalités
 
-- **Inventaire** des volumes présents dans `/var/lib/docker/volumes/`
+- **Inventaire** des volumes via l'API Docker : emplacement réel de chaque volume, quelle que soit l'installation (voir [Emplacement des volumes](#emplacement-des-volumes))
 - **Archivage** d'un volume ou de tous les volumes en `tar.gz`
 - **Réplication** d'un volume vers un serveur distant (SSH + SFTP)
 - **Suivi des tâches** : barre de progression et temps restant pour l'archivage et le transfert
@@ -17,7 +17,7 @@ DockerVol liste les volumes Docker d'un hôte, les archive en `tar.gz` et peut l
 
 ## Prérequis
 
-- Linux avec Docker (accès à `/var/lib/docker/volumes/`)
+- Linux avec Docker
 - Python ≥ 3.9
 - Droits **root** (lecture des volumes Docker)
 
@@ -52,6 +52,7 @@ docker run -d --name dockervol \
 ```
 
 - `/var/lib/docker/volumes` est monté en **lecture seule** : DockerVol ne fait que lire les volumes.
+- Sans le socket Docker, l'image lit simplement ce dossier. Si votre `data-root` est ailleurs, montez-le à la place (`-v /mon/data-root/volumes:/var/lib/docker/volumes:ro`).
 - Les archives et le fichier de log sont écrits dans `/archives`.
 - `-p 127.0.0.1:5000:5000` garde l'interface accessible uniquement depuis l'hôte (voir [Sécurité](#sécurité)).
 
@@ -68,6 +69,8 @@ docker build -t dockervol .
 | `DOCKERVOL_HOST`   | `127.0.0.1` (`0.0.0.0` dans l'image) | Adresse d'écoute de l'interface |
 | `DOCKERVOL_PORT`   | `5000`           | Port d'écoute                                  |
 | `DOCKERVOL_SECRET` | aléatoire        | Clé de session Flask (à fixer en production)  |
+| `DOCKERVOL_PATH`   | non défini       | Force la lecture de ce dossier au lieu de l'API Docker |
+| `DOCKER_HOST`      | non défini       | Socket Docker à utiliser (`unix://…` uniquement) |
 
 ### Ligne de commande
 
@@ -76,6 +79,24 @@ Lister les volumes sans l'interface :
 ```bash
 sudo python3 src/volumes.py
 ```
+
+## Emplacement des volumes
+
+DockerVol interroge l'API Docker (`GET /volumes`) pour connaître le chemin réel de chaque volume. Socket utilisé, dans l'ordre : `DOCKER_HOST` (si `unix://`), `/var/run/docker.sock`, puis `/run/user/*/docker.sock` (Docker rootless). Si aucun n'est joignable, il lit le dossier `/var/lib/docker/volumes/` (ou `DOCKERVOL_PATH`).
+
+| Installation                                   | Prise en charge |
+|------------------------------------------------|-----------------|
+| Docker standard                                | Oui |
+| `data-root` personnalisé (`daemon.json`)       | Oui, via l'API |
+| Docker rootless                                | Oui, via `/run/user/<uid>/docker.sock` |
+| Docker snap                                    | Oui, via l'API |
+| Volume `bind` (`--opt o=bind --opt device=…`)  | Oui : le dossier source est archivé |
+| Volume NFS / CIFS / tmpfs                      | Seulement s'il est monté (un conteneur l'utilise) ; sinon le volume est signalé et non archivable |
+| Driver tiers (plugin)                          | Si son point de montage est accessible depuis l'hôte |
+| Docker Desktop (macOS / Windows)               | Non : les volumes sont dans la VM de Docker Desktop |
+| `DOCKER_HOST` en `tcp://` / `ssh://`           | Non : lecture du dossier à la place |
+
+Les volumes non archivables sont affichés avec la raison, et leur bouton est désactivé. La source utilisée est indiquée en haut à droite de l'interface.
 
 ## Structure du projet
 

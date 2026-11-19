@@ -46,6 +46,7 @@
     button:hover { background: var(--primary-dark); }
     button.secondary { background: var(--card); color: var(--text); border-color: var(--border); }
     button.secondary:hover { background: var(--bg); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
     input, select { width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font: inherit; }
     input:focus, select:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
     label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
@@ -70,7 +71,7 @@
     <div class="inner">
       <img src="{{ url_for('static', filename='logo.svg') }}" alt="">
       <span class="brand">DockerVol</span>
-      <span class="host">/var/lib/docker/volumes</span>
+      {% if source %}<span class="host">{{ source }}</span>{% endif %}
     </div>
   </header>
   <main>

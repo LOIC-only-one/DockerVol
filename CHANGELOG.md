@@ -7,6 +7,9 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 ## [Unreleased]
 
 ### Ajouté
+- Détection des volumes via l'API Docker (socket Unix, sans dépendance) : `data-root` personnalisé, Docker rootless, snap et volumes `bind` pris en charge ; repli sur la lecture du dossier.
+- Volumes NFS/CIFS/tmpfs non montés et données introuvables signalés dans l'interface, au lieu de produire une archive vide.
+- Variable `DOCKERVOL_PATH` pour forcer le dossier des volumes.
 - Workflow GitHub Actions : build de l'image Docker et publication sur GHCR (`latest`, branche, SHA, tags semver).
 - `.dockerignore`.
 - Barre de progression par tâche, avec octets traités et temps restant estimé (archivage puis transfert SSH).

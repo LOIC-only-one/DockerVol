@@ -92,8 +92,8 @@ def index():
         names = volumes.get_docker_volumes()
         error = None
     except OSError as e:
-        names, error = [], f"Impossible de lire {volumes.PATH} : {e}"
-    return flask.render_template("index.j2", volumes=names, error=error)
+        names, error = {}, f"Impossible de lire {volumes.PATH} : {e}"
+    return flask.render_template("index.j2", volumes=names, error=error, source=volumes.SOURCE)
 
 
 @app.post("/archive/<name>")
@@ -104,8 +104,9 @@ def archive(name):
 
 @app.post("/archive-all")
 def archive_all():
-    for name in volumes.get_docker_volumes():
-        _enqueue(name, _archive)
+    for name, info in volumes.get_docker_volumes().items():
+        if not info["problem"]:
+            _enqueue(name, _archive)
     return flask.redirect(flask.url_for("index"))
 
 
