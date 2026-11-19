@@ -8,7 +8,7 @@ DockerVol liste les volumes Docker d'un hôte, les archive en `tar.gz` et peut l
 
 ## Fonctionnalités
 
-- **Inventaire** des volumes via l'API Docker : emplacement réel de chaque volume, quelle que soit l'installation (voir [Emplacement des volumes](#emplacement-des-volumes))
+- **Inventaire** des volumes avec leur emplacement réel, quelle que soit l'installation de Docker (voir [Emplacement des volumes](#emplacement-des-volumes))
 - **Archivage** d'un volume ou de tous les volumes en `tar.gz`
 - **Réplication** d'un volume vers un serveur distant (SSH + SFTP)
 - **Suivi des tâches** : barre de progression et temps restant pour l'archivage et le transfert
@@ -33,34 +33,37 @@ pip install -r requirements.txt
 
 ## Utilisation
 
+Une seule commande, quelle que soit l'installation de Docker (standard, `data-root` personnalisé, rootless, snap). Choisissez l'une des deux méthodes.
+
+**Avec Python** (depuis le dossier du projet, après l'[installation](#installation)) :
+
 ```bash
-sudo .venv/bin/python main.py
+sudo DOCKER_HOST="$(docker context inspect -f '{{.Endpoints.docker.Host}}')" .venv/bin/python main.py
 ```
 
-Puis ouvrir <http://127.0.0.1:5000>.
-
-### Avec Docker
-
-L'image est publiée sur GitHub Container Registry :
+**Avec Docker** (image publiée sur GitHub Container Registry) :
 
 ```bash
 docker run -d --name dockervol \
   -p 127.0.0.1:5000:5000 \
-  -v /var/lib/docker/volumes:/var/lib/docker/volumes:ro \
+  -v "$(docker info -f '{{.DockerRootDir}}')/volumes:/var/lib/docker/volumes:ro" \
   -v "$PWD/archives:/archives" \
   ghcr.io/<owner>/<repo>:latest
 ```
 
-- `/var/lib/docker/volumes` est monté en **lecture seule** : DockerVol ne fait que lire les volumes.
-- Sans le socket Docker, l'image lit simplement ce dossier. Si votre `data-root` est ailleurs, montez-le à la place (`-v /mon/data-root/volumes:/var/lib/docker/volumes:ro`).
-- Les archives et le fichier de log sont écrits dans `/archives`.
-- `-p 127.0.0.1:5000:5000` garde l'interface accessible uniquement depuis l'hôte (voir [Sécurité](#sécurité)).
+Puis ouvrir <http://127.0.0.1:5000>.
 
-Construire l'image localement :
+Ce que font ces commandes :
 
-```bash
-docker build -t dockervol .
-```
+- `docker context inspect` / `docker info` demandent à Docker où il se trouve : rien n'est écrit en dur, donc la même commande marche partout.
+- `sudo` est nécessaire en Python : les volumes ne sont lisibles qu'en root.
+- Les volumes sont montés en **lecture seule** (`:ro`) : DockerVol ne fait que les lire.
+- Les archives et le fichier de log sont écrits dans `./archives` (Docker) ou le dossier courant (Python).
+- `127.0.0.1` garde l'interface accessible uniquement depuis la machine (voir [Sécurité](#sécurité)).
+
+Construire l'image soi-même : `docker build -t dockervol .`
+
+Lister les volumes sans l'interface : `sudo .venv/bin/python src/volumes.py`
 
 ### Variables d'environnement
 
@@ -69,34 +72,21 @@ docker build -t dockervol .
 | `DOCKERVOL_HOST`   | `127.0.0.1` (`0.0.0.0` dans l'image) | Adresse d'écoute de l'interface |
 | `DOCKERVOL_PORT`   | `5000`           | Port d'écoute                                  |
 | `DOCKERVOL_SECRET` | aléatoire        | Clé de session Flask (à fixer en production)  |
-| `DOCKERVOL_PATH`   | non défini       | Force la lecture de ce dossier au lieu de l'API Docker |
-| `DOCKER_HOST`      | non défini       | Socket Docker à utiliser (`unix://…` uniquement) |
-
-### Ligne de commande
-
-Lister les volumes sans l'interface :
-
-```bash
-sudo python3 src/volumes.py
-```
+| `DOCKERVOL_PATH`   | non défini       | Force la lecture de ce dossier de volumes au lieu de la commande `docker` |
 
 ## Emplacement des volumes
 
-DockerVol interroge l'API Docker (`GET /volumes`) pour connaître le chemin réel de chaque volume. Socket utilisé, dans l'ordre : `DOCKER_HOST` (si `unix://`), `/var/run/docker.sock`, puis `/run/user/*/docker.sock` (Docker rootless). Si aucun n'est joignable, il lit le dossier `/var/lib/docker/volumes/` (ou `DOCKERVOL_PATH`).
+En Python, DockerVol utilise `docker volume inspect` pour connaître le dossier exact de chaque volume. Si la commande `docker` n'est pas disponible (c'est le cas dans l'image), il lit le dossier des volumes et le fichier `opts.json` que Docker écrit pour les volumes créés avec des options.
 
-| Installation                                   | Prise en charge |
+| Cas                                            | Prise en charge |
 |------------------------------------------------|-----------------|
-| Docker standard                                | Oui |
-| `data-root` personnalisé (`daemon.json`)       | Oui, via l'API |
-| Docker rootless                                | Oui, via `/run/user/<uid>/docker.sock` |
-| Docker snap                                    | Oui, via l'API |
-| Volume `bind` (`--opt o=bind --opt device=…`)  | Oui : le dossier source est archivé |
-| Volume NFS / CIFS / tmpfs                      | Seulement s'il est monté (un conteneur l'utilise) ; sinon le volume est signalé et non archivable |
-| Driver tiers (plugin)                          | Si son point de montage est accessible depuis l'hôte |
-| Docker Desktop (macOS / Windows)               | Non : les volumes sont dans la VM de Docker Desktop |
-| `DOCKER_HOST` en `tcp://` / `ssh://`           | Non : lecture du dossier à la place |
+| Docker standard, `data-root` personnalisé, rootless, snap | Oui |
+| Volume `bind` (`--opt o=bind --opt device=…`)  | Oui : le dossier source est archivé. Avec l'image Docker, montez aussi ce dossier : `-v /source:/source:ro` |
+| Volume NFS / CIFS / tmpfs                      | Seulement quand il est monté (un conteneur l'utilise) ; sinon il est signalé et non archivable |
+| Driver tiers (plugin)                          | Si son point de montage est accessible |
+| Docker Desktop (macOS / Windows)               | Non : les volumes sont dans la machine virtuelle de Docker Desktop |
 
-Les volumes non archivables sont affichés avec la raison, et leur bouton est désactivé. La source utilisée est indiquée en haut à droite de l'interface.
+Un volume qui ne peut pas être archivé est affiché avec la raison, et son bouton est désactivé : DockerVol ne produit jamais d'archive vide par erreur. La source utilisée est indiquée en haut à droite de l'interface.
 
 ## Structure du projet
 
@@ -111,7 +101,7 @@ Les volumes non archivables sont affichés avec la raison, et leur bouton est d�
 └── src/
     ├── runtime.py       # Interface web (routes Flask)
     ├── volumes.py       # Logique : volumes, archives, SSH/SFTP
-    ├── static/          # Logo et polices (IBM Plex, licence OFL)
+    ├── static/          # Logo et polices (Atkinson Hyperlegible, IBM Plex Mono ; licence OFL)
     └── templates/       # Gabarits Jinja (base.j2, index.j2)
 ```
 
