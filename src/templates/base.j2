@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DockerVol</title>
+  <style>
+    :root {
+      --primary: #2496ED;        /* couleur principale : changer ici */
+      --primary-dark: #1D63ED;
+      --bg: #F4F7FB;
+      --card: #FFFFFF;
+      --text: #1B2533;
+      --muted: #5B6B7F;
+      --border: #DDE5EF;
+      --ok: #1E9E5A;
+      --err: #D64545;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0E1621; --card: #16212E; --text: #E6EDF5; --muted: #8FA1B5; --border: #26364A; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+    header { background: linear-gradient(90deg, var(--primary-dark), var(--primary)); color: #fff; padding: 18px 24px; }
+    header h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
+    header p { margin: 2px 0 0; opacity: .85; font-size: 13px; }
+    main { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { margin: 0 0 12px; font-size: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; font-size: 13px; }
+    td.name { font-family: ui-monospace, monospace; word-break: break-all; }
+    button { background: var(--primary); color: #fff; border: 0; border-radius: 6px; padding: 7px 14px; font: inherit; cursor: pointer; }
+    button:hover { background: var(--primary-dark); }
+    button.ghost { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+    input, select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
+    .flash { padding: 10px 14px; border-radius: 6px; margin-bottom: 10px; color: #fff; }
+    .flash.ok { background: var(--ok); } .flash.err { background: var(--err); }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🐳 DockerVol</h1>
+    <p>Sauvegarde et réplication de volumes Docker</p>
+  </header>
+  <main>
+    {% for cat, msg in get_flashed_messages(with_categories=true) %}
+      <div class="flash {{ cat }}" role="status">{{ msg }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

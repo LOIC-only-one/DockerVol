@@ -1,0 +1,48 @@
+{% extends "base.j2" %}
+{% block content %}
+<section class="card">
+  <div class="row">
+    <h2>Volumes ({{ volumes|length }})</h2>
+    {% if volumes %}
+    <form method="post" action="{{ url_for('archive_all') }}">
+      <button class="ghost">Archiver tous les volumes</button>
+    </form>
+    {% endif %}
+  </div>
+  {% if error %}
+    <div class="flash err">{{ error }}</div>
+  {% elif not volumes %}
+    <p class="muted">Aucun volume Docker trouvé.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>Nom</th><th style="width:1%"></th></tr></thead>
+    <tbody>
+    {% for v in volumes %}
+      <tr>
+        <td class="name">{{ v }}</td>
+        <td><form method="post" action="{{ url_for('archive', name=v) }}"><button>Archiver</button></form></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{% if volumes %}
+<section class="card">
+  <h2>Répliquer vers un serveur distant (SSH)</h2>
+  <form method="post" id="transfer"
+        onsubmit="this.action = '{{ url_for('transfer', name='__V__') }}'.replace('__V__', encodeURIComponent(this.volume.value))">
+    <div class="grid">
+      <div><label for="volume">Volume</label>
+        <select id="volume" name="volume">{% for v in volumes %}<option>{{ v }}</option>{% endfor %}</select></div>
+      <div><label for="host">Hôte</label><input id="host" name="host" required placeholder="192.168.1.10"></div>
+      <div><label for="user">Utilisateur</label><input id="user" name="user" required></div>
+      <div><label for="password">Mot de passe</label><input id="password" name="password" type="password" required></div>
+      <div><label for="remote_dir">Dossier distant</label><input id="remote_dir" name="remote_dir" value="/tmp"></div>
+    </div>
+    <button>Archiver et transférer</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}
