@@ -4,49 +4,61 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DockerVol</title>
+  <link rel="icon" href="{{ url_for('static', filename='logo.svg') }}" type="image/svg+xml">
   <style>
     :root {
       --primary: #2496ED;        /* couleur principale : changer ici */
-      --primary-dark: #1D63ED;
-      --bg: #F4F7FB;
+      --primary-dark: #1A7FCC;
+      --bg: #F6F7F9;
       --card: #FFFFFF;
-      --text: #1B2533;
-      --muted: #5B6B7F;
-      --border: #DDE5EF;
-      --ok: #1E9E5A;
-      --err: #D64545;
+      --text: #1F2328;
+      --muted: #656D76;
+      --border: #D8DEE4;
+      --ok: #1A7F37;
+      --err: #CF222E;
     }
     @media (prefers-color-scheme: dark) {
-      :root { --bg: #0E1621; --card: #16212E; --text: #E6EDF5; --muted: #8FA1B5; --border: #26364A; }
+      :root { --bg: #0D1117; --card: #161B22; --text: #E6EDF3; --muted: #8D96A0; --border: #30363D; --ok: #3FB950; --err: #F85149; }
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
-    header { background: linear-gradient(90deg, var(--primary-dark), var(--primary)); color: #fff; padding: 18px 24px; }
-    header h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
-    header p { margin: 2px 0 0; opacity: .85; font-size: 13px; }
-    main { max-width: 960px; margin: 24px auto; padding: 0 16px; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
-    .card h2 { margin: 0 0 12px; font-size: 16px; }
+    body { margin: 0; font: 14px/1.5 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); }
+    header { background: var(--card); border-bottom: 1px solid var(--border); }
+    header .inner { max-width: 960px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
+    header img { width: 26px; height: 26px; }
+    header .brand { font-weight: 600; font-size: 16px; }
+    header .host { margin-left: auto; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    main { max-width: 960px; margin: 20px auto; padding: 0 16px; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 16px; }
+    section > .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    section > .body { padding: 14px; }
+    h2 { margin: 0; font-size: 14px; font-weight: 600; }
+    .count { color: var(--muted); font-weight: 400; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
-    th { color: var(--muted); font-weight: 600; font-size: 13px; }
-    td.name { font-family: ui-monospace, monospace; word-break: break-all; }
-    button { background: var(--primary); color: #fff; border: 0; border-radius: 6px; padding: 7px 14px; font: inherit; cursor: pointer; }
+    td { padding: 8px 14px; border-top: 1px solid var(--border); vertical-align: middle; }
+    tr:first-child td { border-top: 0; }
+    tr:hover td { background: var(--bg); }
+    td.name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; word-break: break-all; }
+    td.act { width: 1%; white-space: nowrap; }
+    button { background: var(--primary); color: #fff; border: 1px solid var(--primary-dark); border-radius: 4px; padding: 4px 12px; font: inherit; font-size: 13px; cursor: pointer; }
     button:hover { background: var(--primary-dark); }
-    button.ghost { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
-    input, select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
-    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
-    .flash { padding: 10px 14px; border-radius: 6px; margin-bottom: 10px; color: #fff; }
-    .flash.ok { background: var(--ok); } .flash.err { background: var(--err); }
-    .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    button.secondary { background: var(--card); color: var(--text); border-color: var(--border); }
+    button.secondary:hover { background: var(--bg); }
+    input, select { width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font: inherit; }
+    input:focus, select:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+    label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 14px; }
+    .flash { padding: 8px 12px; border: 1px solid; border-left-width: 3px; border-radius: 4px; margin-bottom: 12px; background: var(--card); }
+    .flash.ok { border-color: var(--ok); } .flash.err { border-color: var(--err); }
     .muted { color: var(--muted); }
   </style>
 </head>
 <body>
   <header>
-    <h1>🐳 DockerVol</h1>
-    <p>Sauvegarde et réplication de volumes Docker</p>
+    <div class="inner">
+      <img src="{{ url_for('static', filename='logo.svg') }}" alt="">
+      <span class="brand">DockerVol</span>
+      <span class="host">/var/lib/docker/volumes</span>
+    </div>
   </header>
   <main>
     {% for cat, msg in get_flashed_messages(with_categories=true) %}

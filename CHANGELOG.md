@@ -6,6 +6,18 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Unreleased]
 
+### Ajouté
+- Workflow GitHub Actions : build de l'image Docker et publication sur GHCR (`latest`, branche, SHA, tags semver).
+- `.dockerignore`.
+- Logo SVG (`src/static/logo.svg`), utilisé dans l'interface, comme favicon et dans le README.
+
+### Modifié
+- Dockerfile : base `python:3.13-alpine` (au lieu d'`alpine:3.18`, en fin de vie), dépendances installées depuis `requirements.txt`, archives écrites dans le volume `/archives`, port 5000 exposé.
+- Interface plus sobre : en-tête neutre avec logo, plus de dégradé ni d'emoji, tableau et formulaires plus compacts.
+
+### Corrigé
+- L'image plantait au démarrage : `paramiko` n'était pas installé.
+
 ## [0.1.0] - 2026-11-19
 
 ### Ajouté

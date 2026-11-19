@@ -1,18 +1,21 @@
-FROM alpine:3.18
+FROM python:3.13-alpine
 
 LABEL maintainer="id00l"
 LABEL description="DockerVol: A simple Docker volume management web application."
-LABEL version="0.1.0"
 
-ENV DOCKERVOL_VERSION=0.1.0
-ENV DOCKERVOL_HOST=0.0.0.0
-ENV DOCKERVOL_PORT=5000
+ENV DOCKERVOL_HOST=0.0.0.0 \
+    DOCKERVOL_PORT=5000 \
+    PYTHONUNBUFFERED=1
 
-RUN apk add --no-cache python3 py3-pip
-RUN pip install --no-cache-dir flask
-RUN mkdir -p /app/src
-COPY src/ /app/src/
-COPY main.py /app/
 WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY main.py .
+COPY src/ src/
 
-CMD ["python3", "main.py"]
+# Archives and the log file are written to the working directory: keep them outside the container.
+WORKDIR /archives
+VOLUME /archives
+EXPOSE 5000
+
+CMD ["python", "/app/main.py"]
