@@ -5,48 +5,92 @@
   <div id="job-list"></div>
 </section>
 
+{# Un seul formulaire : la sélection sert aux deux boutons (formaction). #}
+<form method="post" id="main" action="{{ url_for('archive') }}">
 <section>
   <div class="head">
     <h2>Volumes <span class="count">{{ volumes|length }}</span></h2>
-    {% if volumes %}
-    <form method="post" action="{{ url_for('archive_all') }}">
-      <button class="secondary">Tout archiver</button>
-    </form>
-    {% endif %}
+    {% if volumes %}<input type="search" id="filter" placeholder="Filtrer…" aria-label="Filtrer les volumes">{% endif %}
   </div>
   {% if error %}
     <div class="body"><div class="flash err">{{ error }}</div></div>
   {% elif not volumes %}
     <div class="body muted">Aucun volume.</div>
   {% else %}
-  <table>
+  <table id="volumes">
+    <thead><tr>
+      <th class="chk"><input type="checkbox" id="all" aria-label="Tout sélectionner"></th>
+      <th>Nom</th><th class="num">Taille</th>
+    </tr></thead>
+    <tbody>
     {% for v, info in volumes.items() %}
-      <tr>
-        <td class="name">{{ v }}{% if info.problem %}<div class="muted">{{ info.problem }}</div>{% endif %}</td>
-        <td class="act"><form method="post" action="{{ url_for('archive', name=v) }}"><button class="secondary"{% if info.problem %} disabled title="{{ info.problem }}"{% endif %}>Archiver</button></form></td>
+      <tr data-name="{{ v }}">
+        <td class="chk"><input type="checkbox" name="names" value="{{ v }}" aria-label="{{ v }}"{% if info.problem %} disabled{% endif %}></td>
+        <td class="name">{{ v }}{% if info.problem %}<div class="warn">{{ info.problem }}</div>{% endif %}</td>
+        <td class="num size muted">…</td>
       </tr>
     {% endfor %}
+    </tbody>
   </table>
+  <div class="actions">
+    <span id="selected" class="muted">0 sélectionné</span>
+    <label class="inline" {% if not can_stop %}title="Nécessite la commande docker (socket Docker monté dans l'image)"{% endif %}>
+      <input type="checkbox" name="stop"{% if not can_stop %} disabled{% endif %}> Arrêter les conteneurs pendant l'archivage
+    </label>
+    <button class="secondary" formnovalidate disabled data-needs-selection>Archiver</button>
+  </div>
   {% endif %}
 </section>
 
 {% if volumes %}
 <section>
-  <div class="head"><h2>Réplication SSH</h2></div>
-  <form class="body" method="post" id="transfer"
-        onsubmit="this.action = '{{ url_for('transfer', name='__V__') }}'.replace('__V__', encodeURIComponent(this.volume.value))">
+  <div class="head"><h2>Migrer vers Swarm</h2><span class="muted small">archive → envoi SSH → vérification sha256 → restauration</span></div>
+  <div class="body">
+    <fieldset class="modes">
+      <legend>Destination</legend>
+      <label class="mode"><input type="radio" name="mode" value="node" checked>
+        <span><b>Nœud précis</b><br><span class="muted small">docker volume create sur ce nœud (contrainte de placement)</span></span></label>
+      <label class="mode"><input type="radio" name="mode" value="shared">
+        <span><b>Stockage partagé</b><br><span class="muted small">extraction dans &lt;dossier&gt;/&lt;volume&gt; (NFS, GlusterFS…)</span></span></label>
+    </fieldset>
     <div class="grid">
-      <div><label for="volume">Volume</label>
-        <select id="volume" name="volume">{% for v, info in volumes.items() if not info.problem %}<option>{{ v }}</option>{% endfor %}</select></div>
       <div><label for="host">Hôte</label><input id="host" name="host" required placeholder="192.168.1.10"></div>
-      <div><label for="user">Utilisateur</label><input id="user" name="user" required></div>
-      <div><label for="password">Mot de passe</label><input id="password" name="password" type="password" required></div>
-      <div><label for="remote_dir">Dossier distant</label><input id="remote_dir" name="remote_dir" value="/tmp"></div>
+      <div><label for="port">Port</label><input id="port" name="port" type="number" value="22" min="1" max="65535"></div>
+      <div><label for="user">Utilisateur</label><input id="user" name="user" required value="root"></div>
+      <div><label for="key_path">Clé privée <span class="muted">(chemin)</span></label><input id="key_path" name="key_path" placeholder="/root/.ssh/id_ed25519"></div>
+      <div><label for="password">Mot de passe <span class="muted">(si pas de clé)</span></label><input id="password" name="password" type="password" autocomplete="off"></div>
+      <div id="shared-field" hidden><label for="shared_dir">Dossier partagé</label><input id="shared_dir" name="shared_dir" placeholder="/mnt/nfs/volumes"></div>
     </div>
-    <button>Archiver et transférer</button>
-  </form>
+    <button formaction="{{ url_for('migrate') }}" disabled data-needs-selection>Migrer la sélection</button>
+    <span class="muted small">Rien n'est écrasé : un volume déjà présent sur la cible fait échouer la tâche.</span>
+  </div>
 </section>
 {% endif %}
+</form>
+
+<section>
+  <div class="head"><h2>Archives <span class="count">{{ archives|length }}</span></h2></div>
+  {% if not archives %}
+    <div class="body muted">Aucune archive.</div>
+  {% else %}
+  <table>
+    <tbody>
+    {% for a in archives %}
+      <tr>
+        <td class="name">{{ a.name }}</td>
+        <td class="num muted" data-bytes="{{ a.size }}"></td>
+        <td class="num muted" data-time="{{ a.mtime }}"></td>
+        <td class="act">
+          <a class="btn secondary" href="{{ url_for('download_archive', name=a.name) }}" download>Télécharger</a>
+          <form method="post" action="{{ url_for('delete_archive', name=a.name) }}" onsubmit="return confirm('Supprimer cette archive ?')">
+            <button class="danger">Supprimer</button></form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
 
 <script>
   const fmtSize = n => {
@@ -66,7 +110,47 @@
     if (text != null) e.textContent = text;  // textContent: volume names and errors are never parsed as HTML
     return e;
   };
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 
+  // Archives : taille et date lisibles.
+  $$("[data-bytes]").forEach(td => td.textContent = fmtSize(+td.dataset.bytes));
+  $$("[data-time]").forEach(td => td.textContent = new Date(td.dataset.time * 1000).toLocaleString("fr-FR", {dateStyle: "short", timeStyle: "short"}));
+
+  // Sélection : compteur, boutons, case « tout ».
+  const boxes = $$("input[name=names]:not(:disabled)");
+  function refresh() {
+    const n = boxes.filter(b => b.checked).length;
+    if ($("#selected")) $("#selected").textContent = n + " sélectionné" + (n > 1 ? "s" : "");
+    $$("[data-needs-selection]").forEach(b => b.disabled = n === 0);
+  }
+  boxes.forEach(b => b.addEventListener("change", refresh));
+  $("#all")?.addEventListener("change", e => {
+    boxes.forEach(b => { if (!b.closest("tr").hidden) b.checked = e.target.checked; });
+    refresh();
+  });
+
+  // Filtre par nom.
+  $("#filter")?.addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    $$("#volumes tbody tr").forEach(tr => tr.hidden = !tr.dataset.name.toLowerCase().includes(q));
+  });
+
+  // Mode de destination : le dossier partagé n'est demandé qu'en mode partagé.
+  $$("input[name=mode]").forEach(r => r.addEventListener("change", () => {
+    const shared = $("input[name=mode]:checked").value === "shared";
+    $("#shared-field").hidden = !shared;
+    $("#shared_dir").required = shared;
+  }));
+
+  // Tailles calculées après l'affichage (parcours de tous les fichiers).
+  if (boxes.length || $("#volumes")) fetch("{{ url_for('sizes') }}").then(r => r.json()).then(sizes => {
+    $$("#volumes tbody tr").forEach(tr => {
+      const s = sizes[tr.dataset.name];
+      tr.querySelector(".size").textContent = s == null ? "—" : fmtSize(s);
+    });
+  }).catch(() => {});
+
+  const ACTIONS = {archive: "Archivage", migrate: "Migration"};
   function describe(j) {
     if (j.status === "queued") return "En attente";
     if (j.status === "error") return "Erreur : " + j.error;
@@ -77,21 +161,25 @@
     return parts.join(" · ");
   }
 
+  let wasRunning = false;
   async function poll() {
     let list;
     try { list = await (await fetch("{{ url_for('job_list') }}")).json(); }
     catch { return setTimeout(poll, 3000); }
-    document.getElementById("jobs").hidden = list.length === 0;
-    const box = document.getElementById("job-list");
-    box.replaceChildren(...list.map(j => {
+    $("#jobs").hidden = list.length === 0;
+    $("#job-list").replaceChildren(...list.map(j => {
       const row = el("div", "job " + j.status), line = el("div", "line"), bar = el("div", "bar"), fill = el("div");
-      line.append(el("span", "vol", j.volume), el("span", "info" + (j.status === "error" ? " err" : ""), describe(j)));
+      const who = el("span", "vol", j.volume);
+      who.prepend(el("span", "tag", ACTIONS[j.action] || j.action));
+      line.append(who, el("span", "info" + (j.status === "error" ? " err" : ""), describe(j)));
       fill.style.width = (j.status === "done" ? 100 : j.total ? 100 * j.done / j.total : 0) + "%";
       bar.append(fill);
       row.append(line, bar);
       return row;
     }));
-    if (list.some(j => j.status === "queued" || j.status === "running")) setTimeout(poll, 1000);
+    const running = list.some(j => j.status === "queued" || j.status === "running");
+    if (running) { wasRunning = true; setTimeout(poll, 1000); }
+    else if (wasRunning) location.reload();  // nouvelles archives à afficher
   }
   poll();
 </script>
