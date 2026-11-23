@@ -9,7 +9,8 @@ ENV DOCKERVOL_HOST=0.0.0.0 \
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# docker-cli : arrêt des conteneurs pendant l'archivage, si le socket Docker est monté.
+RUN apk add --no-cache docker-cli && pip install --no-cache-dir -r requirements.txt
 COPY main.py .
 COPY src/ src/
 

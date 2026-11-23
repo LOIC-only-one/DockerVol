@@ -10,7 +10,10 @@ DockerVol liste les volumes Docker d'un hôte, les archive en `tar.gz` et peut l
 
 - **Inventaire** des volumes avec leur emplacement réel, quelle que soit l'installation de Docker (voir [Emplacement des volumes](#emplacement-des-volumes))
 - **Archivage** d'un volume ou de tous les volumes en `tar.gz`
-- **Réplication** d'un volume vers un serveur distant (SSH + SFTP)
+- **Migration vers Docker Swarm** d'un ou plusieurs volumes, par SSH (clé ou mot de passe), avec vérification sha256 et restauration automatique, sur un **nœud précis** ou un **stockage partagé** (voir [Migration vers Swarm](#migration-vers-swarm))
+- **Arrêt des conteneurs** pendant l'archivage (bases de données cohérentes), relancés ensuite même en cas d'erreur
+- **Archives horodatées** (`<volume>_AAAAMMJJ-HHMMSS.tar.gz`), à télécharger ou supprimer depuis l'interface
+- **Sélection multiple**, filtre, taille de chaque volume
 - **Suivi des tâches** : barre de progression et temps restant pour l'archivage et le transfert
 - **Interface web** claire, avec thème clair/sombre automatique
 - **Journalisation** des erreurs dans `docker_volume_transfer.log`
@@ -48,6 +51,8 @@ docker run -d --name dockervol \
   -p 127.0.0.1:5000:5000 \
   -v "$(docker info -f '{{.DockerRootDir}}')/volumes:/var/lib/docker/volumes:ro" \
   -v "$PWD/archives:/archives" \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$HOME/.ssh:/root/.ssh:ro" \
   ghcr.io/<owner>/<repo>:latest
 ```
 
@@ -59,6 +64,7 @@ Ce que font ces commandes :
 - `sudo` est nécessaire en Python : les volumes ne sont lisibles qu'en root.
 - Les volumes sont montés en **lecture seule** (`:ro`) : DockerVol ne fait que les lire.
 - Les archives et le fichier de log sont écrits dans `./archives` (Docker) ou le dossier courant (Python).
+- Le socket Docker (facultatif) permet d'arrêter les conteneurs pendant l'archivage ; `~/.ssh` (facultatif) donne accès à vos clés SSH (`/root/.ssh/id_ed25519` dans le formulaire).
 - `127.0.0.1` garde l'interface accessible uniquement depuis la machine (voir [Sécurité](#sécurité)).
 
 Construire l'image soi-même : `docker build -t dockervol .`
@@ -73,6 +79,22 @@ Lister les volumes sans l'interface : `sudo .venv/bin/python src/volumes.py`
 | `DOCKERVOL_PORT`   | `5000`           | Port d'écoute                                  |
 | `DOCKERVOL_SECRET` | aléatoire        | Clé de session Flask (à fixer en production)  |
 | `DOCKERVOL_PATH`   | non défini       | Force la lecture de ce dossier de volumes au lieu de la commande `docker` |
+
+## Migration vers Swarm
+
+Cochez les volumes, remplissez le formulaire « Migrer vers Swarm » et lancez. Pour chaque volume, DockerVol :
+
+1. arrête ses conteneurs (si la case est cochée) et l'archive, puis les relance ;
+2. envoie l'archive par SFTP dans `/tmp` de la cible ;
+3. compare son sha256 avec l'original ;
+4. restaure, puis supprime l'archive temporaire de la cible.
+
+| Mode | Ce qui est fait sur la cible | Prérequis sur la cible |
+|------|------------------------------|------------------------|
+| **Nœud précis** | `docker volume create <volume>`, puis extraction par un conteneur `alpine` jetable | SSH, utilisateur root ou du groupe `docker`, image `alpine` téléchargeable. Placez ensuite le service sur ce nœud (`node.hostname == …`) |
+| **Stockage partagé** | Extraction dans `<dossier partagé>/<volume>` | SSH, droit d'écriture sur le dossier (NFS, GlusterFS, Ceph… monté sur ce nœud) |
+
+**Rien n'est écrasé** : si le volume existe déjà sur le nœud, ou si le dossier partagé n'est pas vide, la tâche échoue avant l'envoi.
 
 ## Emplacement des volumes
 
@@ -100,12 +122,15 @@ Un volume qui ne peut pas être archivé est affiché avec la raison, et son bou
 │   └── docker.yml       # Build et publication de l'image sur GHCR
 └── src/
     ├── runtime.py       # Interface web (routes Flask)
-    ├── volumes.py       # Logique : volumes, archives, SSH/SFTP
+    ├── volumes.py       # Volumes, archives, arrêt/relance des conteneurs
+    ├── remote.py        # SSH/SFTP, vérification sha256, restauration distante
     ├── static/          # Logo et polices (Atkinson Hyperlegible, IBM Plex Mono ; licence OFL)
     └── templates/       # Gabarits Jinja (base.j2, index.j2)
 ```
 
-Les archives sont créées dans le répertoire courant (`/archives` dans l'image), sous le nom `<volume>.tar.gz`.
+Les archives sont créées dans le répertoire courant (`/archives` dans l'image), sous le nom `<volume>_AAAAMMJJ-HHMMSS.tar.gz`.
+
+Tests : `python -m unittest discover tests`
 
 ## Intégration continue
 
@@ -141,8 +166,8 @@ La couleur principale de l'interface se règle avec la variable `--primary` dans
 ## Feuille de route
 
 - [ ] Authentification de l'interface
-- [ ] Authentification SSH par clé
-- [ ] Restauration d'une archive vers un volume
+- [x] Authentification SSH par clé
+- [x] Restauration d'une archive vers un volume (distant, nœud ou stockage partagé)
 - [x] Image Docker du projet
 
 ## Changelog

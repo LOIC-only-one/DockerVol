@@ -7,6 +7,11 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 ## [Unreleased]
 
 ### Ajouté
+- Migration vers Docker Swarm : envoi SSH (clé ou mot de passe, port configurable), vérification sha256 sur la cible, restauration sur un nœud précis (`docker volume create` + conteneur `alpine`) ou dans un stockage partagé. Aucun écrasement : un volume existant ou un dossier non vide fait échouer la tâche avant l'envoi.
+- Arrêt optionnel des conteneurs d'un volume pendant l'archivage, relancés ensuite même en cas d'erreur (`docker-cli` ajouté à l'image).
+- Archives horodatées, section « Archives » (taille, date, téléchargement, suppression).
+- Interface : sélection multiple, filtre, taille de chaque volume chargée en arrière-plan, choix du mode de destination.
+- Tests unitaires (`tests/`, `unittest`).
 - Détection des volumes avec `docker volume inspect` : `data-root` personnalisé, Docker rootless, snap et volumes `bind` pris en charge ; repli sur la lecture du dossier (et de `opts.json`) quand la commande `docker` est absente.
 - Volumes NFS/CIFS/tmpfs non montés et données introuvables signalés dans l'interface, au lieu de produire une archive vide.
 - Variable `DOCKERVOL_PATH` pour forcer le dossier des volumes.
@@ -18,6 +23,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 - Logo SVG (`src/static/logo.svg`), utilisé dans l'interface, comme favicon et dans le README.
 
 ### Modifié
+- Routes `/archive/<nom>`, `/archive-all` et `/transfer/<nom>` remplacées par `/archive` et `/migrate` (sélection multiple).
+- Dans l'image, les volumes sont toujours lus dans le dossier monté (la commande `docker` donnerait les chemins de l'hôte).
 - Commande de lancement unique (Python ou Docker) valable pour toutes les installations de Docker.
 - Code de `volumes.py` et `runtime.py` simplifié et commenté.
 - Dockerfile : base `python:3.13-alpine` (au lieu d'`alpine:3.18`, en fin de vie), dépendances installées depuis `requirements.txt`, archives écrites dans le volume `/archives`, port 5000 exposé.
