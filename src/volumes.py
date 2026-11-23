@@ -1,12 +1,12 @@
 import os
 import sys
 import json
+import glob
+import hashlib
 import tarfile
-import socket
 import logging
 import subprocess
-
-import paramiko
+from datetime import datetime
 
 # Dossier des volumes, utilisé quand la commande docker n'est pas disponible
 # (par exemple dans l'image Docker de DockerVol) ou quand DOCKERVOL_PATH est défini.
@@ -119,7 +119,8 @@ def get_docker_volumes():
     global SOURCE
 
     volumes = None
-    if "DOCKERVOL_PATH" not in os.environ:
+    # Dans un conteneur, docker donnerait les chemins de l'hôte : on lit le dossier monté.
+    if "DOCKERVOL_PATH" not in os.environ and not IN_CONTAINER:
         volumes = list_volumes_with_docker()
 
     if volumes is None:
@@ -193,10 +194,10 @@ def create_archive(volume_name, progress=None):
         raise ValueError(f"{volume_name} : {volumes[volume_name]['problem']}")
 
     volume_path = volumes[volume_name]["path"]
-    archive_name = os.path.abspath(f"{volume_name}.tar.gz")
+    archive_path = os.path.abspath(archive_name(volume_name, datetime.now()))
 
     try:
-        with tarfile.open(archive_name, "w:gz") as tar:
+        with tarfile.open(archive_path, "w:gz") as tar:
             for path in list_entries(volume_path):
                 # Noms dans l'archive : ".", "./fichier", "./dossier/fichier"... comme tar -C dossier .
                 relative = os.path.relpath(path, volume_path)
@@ -216,52 +217,72 @@ def create_archive(volume_name, progress=None):
                     tar.addfile(entry)
     except BaseException:
         # Ne jamais laisser une archive incomplète qui aurait l'air valide.
-        if os.path.exists(archive_name):
-            os.remove(archive_name)
+        if os.path.exists(archive_path):
+            os.remove(archive_path)
         raise
 
-    print(f"Archive créée : {archive_name}")
-    return archive_name
+    print(f"Archive créée : {archive_path}")
+    return archive_path
 
 
-def create_archive_for_all_volumes():
+def archive_name(volume_name, now):
     """
-    Permet de créer une archive tar.gz pour tous les volumes Docker présents sur le système.
+    Nom horodaté : une nouvelle archive n'écrase jamais la précédente.
     """
-    for volume in get_docker_volumes():
-        create_archive(volume)
+    return f"{volume_name}_{now:%Y%m%d-%H%M%S}.tar.gz"
 
 
-#### Création du handler qui permet de repliquer les volumes Docker sur un autre serveur distant via SSH. ####
-
-def connexion_ssh(hostname, username, password):
+def list_archives():
     """
-    Permet d'établir une connexion SSH avec un serveur distant.
+    Archives du dossier courant, la plus récente d'abord : [{"name", "size", "mtime"}].
+    """
+    result = []
+    for path in glob.glob("*.tar.gz"):
+        st = os.stat(path)
+        result.append({"name": path, "size": st.st_size, "mtime": st.st_mtime})
+    return sorted(result, key=lambda a: a["mtime"], reverse=True)
+
+
+def sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+#### Conteneurs (arrêt pendant l'archivage) ####
+
+def docker(*args):
+    return subprocess.run(["docker", *args], capture_output=True, text=True, check=True).stdout
+
+
+def docker_available():
+    """
+    Vrai si la commande docker répond (dans l'image : socket Docker monté).
     """
     try:
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(hostname, username=username, password=password)
-        return client
-    except (paramiko.AuthenticationException, paramiko.SSHException, socket.error) as e:
-        logging.error(f"Erreur lors de la connexion SSH : {e}")
-        return None
-
-
-def transfer_archive(client, local_path, remote_path, progress=None):
-    """
-    Permet de transférer une archive tar.gz vers un serveur distant via SFTP.
-    progress(octets_envoyes, total), si donné, est appelé par paramiko pendant l'envoi.
-    """
-    try:
-        sftp = client.open_sftp()
-        sftp.put(local_path, remote_path, callback=progress)
-        sftp.close()
-        print(f"Transfert réussi : {local_path} -> {remote_path}")
+        docker("version", "-f", "{{.Server.Version}}")
         return True
-    except Exception as e:
-        logging.error(f"Erreur lors du transfert de l'archive : {e}")
+    except (OSError, subprocess.CalledProcessError):
         return False
+
+
+def containers_using(volume_name):
+    """
+    Identifiants des conteneurs en marche qui utilisent ce volume.
+    """
+    return docker("ps", "-q", "--filter", f"volume={volume_name}").split()
+
+
+def stop_containers(ids):
+    if ids:
+        docker("stop", *ids)
+
+
+def start_containers(ids):
+    if ids:
+        docker("start", *ids)
 
 
 if __name__ == "__main__":
