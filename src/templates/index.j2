@@ -44,25 +44,27 @@
 
 {% if volumes %}
 <section>
-  <div class="head"><h2>Migrer vers Swarm</h2><span class="muted small">archive → envoi SSH → vérification sha256 → restauration</span></div>
+  <div class="head"><h2>Migrer vers Swarm</h2><div class="steps"><span>archive</span>→<span>envoi SSH</span>→<span>sha256</span>→<span>restauration</span></div></div>
   <div class="body">
     <fieldset class="modes">
       <legend>Destination</legend>
       <label class="mode"><input type="radio" name="mode" value="node" checked>
-        <span><b>Nœud précis</b><br><span class="muted small">docker volume create sur ce nœud (contrainte de placement)</span></span></label>
+        <span><b>Nœud précis</b><br><span class="muted small"><code>docker volume create</code> sur ce nœud (contrainte de placement)</span></span></label>
       <label class="mode"><input type="radio" name="mode" value="shared">
-        <span><b>Stockage partagé</b><br><span class="muted small">extraction dans &lt;dossier&gt;/&lt;volume&gt; (NFS, GlusterFS…)</span></span></label>
+        <span><b>Stockage partagé</b><br><span class="muted small">extraction dans <code>&lt;dossier&gt;/&lt;volume&gt;</code> (NFS, GlusterFS…)</span></span></label>
     </fieldset>
     <div class="grid">
       <div><label for="host">Hôte</label><input id="host" name="host" required placeholder="192.168.1.10"></div>
       <div><label for="port">Port</label><input id="port" name="port" type="number" value="22" min="1" max="65535"></div>
       <div><label for="user">Utilisateur</label><input id="user" name="user" required value="root"></div>
-      <div><label for="key_path">Clé privée <span class="muted">(chemin)</span></label><input id="key_path" name="key_path" placeholder="/root/.ssh/id_ed25519"></div>
+      <div class="wide"><label for="key_path">Clé privée <span class="muted">(chemin)</span></label><input id="key_path" name="key_path" placeholder="/root/.ssh/id_ed25519"></div>
       <div><label for="password">Mot de passe <span class="muted">(si pas de clé)</span></label><input id="password" name="password" type="password" autocomplete="off"></div>
-      <div id="shared-field" hidden><label for="shared_dir">Dossier partagé</label><input id="shared_dir" name="shared_dir" placeholder="/mnt/nfs/volumes"></div>
+      <div id="shared-field" class="wide" hidden><label for="shared_dir">Dossier partagé</label><input id="shared_dir" name="shared_dir" placeholder="/mnt/nfs/volumes"></div>
     </div>
-    <button formaction="{{ url_for('migrate') }}" disabled data-needs-selection>Migrer la sélection</button>
-    <span class="muted small">Rien n'est écrasé : un volume déjà présent sur la cible fait échouer la tâche.</span>
+    <div class="submit">
+      <span class="muted small">Rien n'est écrasé : un volume déjà présent sur la cible fait échouer la tâche.</span>
+      <button formaction="{{ url_for('migrate') }}" disabled data-needs-selection style="margin-left:auto">Migrer la sélection</button>
+    </div>
   </div>
 </section>
 {% endif %}
@@ -74,17 +76,18 @@
     <div class="body muted">Aucune archive.</div>
   {% else %}
   <table>
+    <thead><tr><th>Fichier</th><th class="num">Taille</th><th class="num">Date</th><th></th></tr></thead>
     <tbody>
     {% for a in archives %}
       <tr>
         <td class="name">{{ a.name }}</td>
         <td class="num muted" data-bytes="{{ a.size }}"></td>
         <td class="num muted" data-time="{{ a.mtime }}"></td>
-        <td class="act">
-          <a class="btn secondary" href="{{ url_for('download_archive', name=a.name) }}" download>Télécharger</a>
+        <td class="act"><div>
+          <a class="btn" href="{{ url_for('download_archive', name=a.name) }}" download>Télécharger</a>
           <form method="post" action="{{ url_for('delete_archive', name=a.name) }}" onsubmit="return confirm('Supprimer cette archive ?')">
             <button class="danger">Supprimer</button></form>
-        </td>
+        </div></td>
       </tr>
     {% endfor %}
     </tbody>
@@ -124,6 +127,12 @@
     $$("[data-needs-selection]").forEach(b => b.disabled = n === 0);
   }
   boxes.forEach(b => b.addEventListener("change", refresh));
+  // Clic n'importe où sur la ligne = cocher la case.
+  $$("#volumes tbody tr").forEach(tr => tr.addEventListener("click", e => {
+    const b = tr.querySelector("input[name=names]");
+    if (e.target === b || b.disabled) return;
+    b.checked = !b.checked; refresh();
+  }));
   $("#all")?.addEventListener("change", e => {
     boxes.forEach(b => { if (!b.closest("tr").hidden) b.checked = e.target.checked; });
     refresh();
