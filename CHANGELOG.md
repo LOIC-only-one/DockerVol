@@ -6,6 +6,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-26
+
 ### Ajouté
 - Migration vers Docker Swarm : envoi SSH (clé ou mot de passe, port configurable), vérification sha256 sur la cible, restauration sur un nœud précis (`docker volume create` + conteneur `alpine`) ou dans un stockage partagé. Aucun écrasement : un volume existant ou un dossier non vide fait échouer la tâche avant l'envoi.
 - Arrêt optionnel des conteneurs d'un volume pendant l'archivage, relancés ensuite même en cas d'erreur (`docker-cli` ajouté à l'image).
